@@ -1061,6 +1061,7 @@ frontend:
 EOF
 
 
+sudo usermod -a -G audio daniel
 
 # The allow any is needed or else rtkit won't let PipeWire work right.
 cat << EOF > /usr/share/polkit-1/actions/org.freedesktop.RealtimeKit1.policy
@@ -1100,6 +1101,21 @@ EOF
 
 
 
+cat << EOF > /etc/security/limits.d/audio.conf 
+
+# Provided by the jackd package.
+#
+# Changes to this file will be preserved.
+#
+# If you want to enable/disable realtime permissions, run
+#
+#    dpkg-reconfigure -p high jackd
+
+@audio   -  rtprio     95
+@audio   -  memlock    unlimited
+@audio   -  nice      -15
+EOF
+
 
 # Here we turn on Pipewire
 
@@ -1109,8 +1125,15 @@ EOF
 
 #PipeWire
 
+# To uninstall the old stuff you might need to try
+# sudo apt purge  libpipewire-0.3-0 pipewire pipewire-bin libspa-0.2-modules
+
 apt-get install -y pipewire libspa-0.2-jack pipewire-audio-client-libraries libspa-0.2-bluetooth 
-apt-get remove -y pulseaudio-module-bluetooth
+apt-get remove -y pulseaudio-module-bluetooth 
+
+! apt-get purge -y pipewire-media-session
+apt-get -y install wireplumber
+
 
 mkdir -p /etc/pipewire/media-session.d/
 touch /etc/pipewire/media-session.d/with-pulseaudio
@@ -1127,34 +1150,14 @@ su -c 'XDG_RUNTIME_DIR="/run/user/$UID" DBUS_SESSION_BUS_ADDRESS="unix:path=${XD
 
 
 
-cat << EOF > /usr/lib/systemd/user/pipewire-media-session.service
-[Unit]
-Description=Multimedia Service Session Manager
-After=pipewire.service
-BindsTo=pipewire.service
 
-[Service]
-LockPersonality=yes
-MemoryDenyWriteExecute=yes
-NoNewPrivileges=yes
-RestrictNamespaces=yes
-SystemCallArchitectures=native
-SystemCallFilter=@system-service
-Type=simple
-ExecStart=/usr/bin/pipewire-media-session
-Restart=on-failure
-Slice=session.slice
 
-[Install]
-WantedBy=pipewire.service
-EOF
-
-su -c 'XDG_RUNTIME_DIR="/run/user/$UID" DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus" systemctl --user enable pipewire-media-session' ember
+su -c 'XDG_RUNTIME_DIR="/run/user/$UID" DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus" systemctl --user enable wireplumber' ember
 su -c 'XDG_RUNTIME_DIR="/run/user/$UID" DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus" systemctl --user enable pipewire' ember
 
 su -c 'XDG_RUNTIME_DIR="/run/user/$UID" DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus" systemctl --user mask pulseaudio' ember
 
-
+mkdir -p /etc/pipewire/media-session.d/with
 touch /etc/pipewire/media-session.d/with-jack
 cp /usr/share/doc/pipewire/examples/ld.so.conf.d/pipewire-jack-*.conf /etc/ld.so.conf.d/
 ldconfig
@@ -1671,7 +1674,7 @@ EOF
 apt-get -y install deluge audacity vlc vlc-plugin-base vlc-plugin-access-extra vlc-plugin-jack vlc-plugin-skins2 vlc-plugin-svg
 apt-get -y install mumble-server baresip twinkle 
 sudo systemctl disable mumble-server.service
-apt-get -y install mumble qtox  gimp 
+apt-get -y install mumble qtox gimp solaar
 
 
 
